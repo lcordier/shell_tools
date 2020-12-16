@@ -1,0 +1,89 @@
+#!/usr/bin/env python
+
+""" A simple command-line Pomodoro Timer.
+"""
+import optparse
+import os
+import subprocess
+import sys
+from time import sleep
+
+
+ALARM = 'mplayer {} 1>/dev/null 2>&1'.format(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pomodoro.mp3'))
+
+
+class App():
+    def __init__(self, time, font):
+        self.time = time
+        self.font = font
+        self.update_clock()
+        self.mainloop()
+
+    def time_string(self):
+        minutes, seconds = divmod(self.time, 60)
+        if self.time >= 0:
+            ts = '{:02d}:{:02d}'.format(minutes, seconds)
+        else:
+            ts = '00:00'
+        return ts
+
+    def alarm(self):
+        subprocess.check_call(ALARM, shell=True)
+        sys.exit()
+
+    def update_clock(self):
+        print('\033[H\033[2J')
+        command = "figlet -k -f {font} {text}".format(font=self.font, text=self.time_string())
+        output = subprocess.check_output(command, shell=True)
+        print(output.decode('utf-8'))
+        self.time -= 1
+        if self.time <= -1:
+            self.alarm()
+
+    def mainloop(self):
+        while True:
+            sleep(1.0)
+            self.update_clock()
+
+
+if __name__ == '__main__':
+
+    parser = optparse.OptionParser('%prog [options] 25:00')
+
+    parser.add_option('-f',
+                      '--font',
+                      dest='font',
+                      action='store',
+                      type='string',
+                      default='standard',
+                      help='figlet font [standard]')
+
+    parser.add_option('-l',
+                      '--list',
+                      dest='list',
+                      action='store_true',
+                      default=False,
+                      help='list all figlet fonts')
+
+    options, args = parser.parse_args()
+
+    if options.list:
+        command = """for f in /usr/share/figlet/*.flf; do font="$(echo $(basename $f) | cut -d '.' -f 1)"; figlet -k -f $font $font; done"""
+        subprocess.check_call(command, shell=True)
+        sys.exit()
+
+    font = options.font
+
+    if not args:
+        time = 25 * 60
+    else:
+        time = args[0]
+        if ':' in time:
+            p = time.split(':')
+            time = int(p[0] or '0') * 60 + int(p[1] or '0')
+
+    try:
+        app=App(time, font)
+    except KeyboardInterrupt:
+        sys.exit()
+
